@@ -49,10 +49,34 @@ type RefundRequested = {
   platformAdminIds: number[];
 };
 
+/**
+ * A reply to a top-level comment. Only that comment's author hears of it;
+ * earlier repliers get nothing.
+ */
+type CommentReplied = {
+  kind: NotificationKind.CommentReplied;
+  replierId: number;
+  replierName: string;
+  commentAuthorId: number;
+  lessonTitle: string;
+  threadLink: string;
+};
+
+/** A new top-level comment, which reaches the course's Instructor. */
+type QuestionPosted = {
+  kind: NotificationKind.QuestionPosted;
+  authorId: number;
+  instructorId: number;
+  lessonTitle: string;
+  courseTitle: string;
+};
+
 export type NotificationEvent =
   | SeatClaimed
   | RefundRequestDecided
-  | RefundRequested;
+  | RefundRequested
+  | CommentReplied
+  | QuestionPosted;
 
 /**
  * Writes the Notifications an event causes and returns its Emails. Never
@@ -66,7 +90,42 @@ export function notify(tx: Queryable, event: NotificationEvent): Email[] {
       return notifyRefundRequestDecided(tx, event);
     case NotificationKind.RefundRequested:
       return notifyRefundRequested(tx, event);
+    case NotificationKind.CommentReplied:
+      return notifyCommentReplied(tx, event);
+    case NotificationKind.QuestionPosted:
+      return notifyQuestionPosted(tx, event);
   }
+}
+
+// Comment snapshots never quote the comment body.
+function notifyCommentReplied(tx: Queryable, event: CommentReplied): Email[] {
+  if (event.commentAuthorId !== event.replierId) {
+    tx.insert(notifications)
+      .values({
+        recipientId: event.commentAuthorId,
+        kind: event.kind,
+        text: `${event.replierName} replied to your comment on ${event.lessonTitle}`,
+        link: event.threadLink,
+      })
+      .run();
+  }
+  // Its Re-engagement Email arrives with the pending_emails sweeper.
+  return [];
+}
+
+function notifyQuestionPosted(tx: Queryable, event: QuestionPosted): Email[] {
+  if (event.instructorId !== event.authorId) {
+    tx.insert(notifications)
+      .values({
+        recipientId: event.instructorId,
+        kind: event.kind,
+        text: `New question on ${event.lessonTitle} in ${event.courseTitle}`,
+        link: "/instructor/questions",
+      })
+      .run();
+  }
+  // Its Re-engagement Email arrives with the pending_emails sweeper.
+  return [];
 }
 
 function notifySeatClaimed(tx: Queryable, event: SeatClaimed): Email[] {
