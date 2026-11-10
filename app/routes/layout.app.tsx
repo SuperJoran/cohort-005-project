@@ -1,4 +1,11 @@
-import { Outlet } from "react-router";
+import { Outlet, useSearchParams } from "react-router";
+import { useMemo } from "react";
+import { PrototypeSwitcher } from "~/components/prototype-switcher";
+import {
+  NOTIFICATION_VARIANTS,
+  useNotificationsPrototype,
+} from "~/components/notifications-prototype/variants";
+import { mockNotificationsFor } from "~/components/notifications-prototype/mock-data";
 import type { Route } from "./+types/layout.app";
 import { Sidebar } from "~/components/sidebar";
 import { DevUI } from "~/components/dev-ui";
@@ -227,12 +234,24 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     isTeamAdmin: userIsTeamAdmin,
   } = loaderData;
 
+  // PROTOTYPE: notification-list variants (?variant=A|B|C|D)
+  const [searchParams] = useSearchParams();
+  const variant = searchParams.get("variant") ?? "A";
+  const initialNotifications = useMemo(
+    () => mockNotificationsFor(currentUser?.role ?? null, userIsTeamAdmin),
+    [currentUser?.id, currentUser?.role, userIsTeamAdmin]
+  );
+  const proto = useNotificationsPrototype(variant, initialNotifications);
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
         currentUser={currentUser}
         recentCourses={recentCourses}
         isTeamAdmin={userIsTeamAdmin}
+        headerSlot={proto.headerSlot}
+        navSlot={proto.navSlot}
+        sidebarSection={proto.sidebarSection}
       />
       <main className="flex-1 overflow-y-auto">
         <Outlet />
@@ -244,6 +263,8 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
         countryTierInfo={countryTierInfo}
         countries={countries}
       />
+      {proto.overlay}
+      {currentUser && <PrototypeSwitcher variants={NOTIFICATION_VARIANTS} />}
       <Toaster position="bottom-right" richColors closeButton />
     </div>
   );
