@@ -46,6 +46,8 @@ export enum NotificationKind {
   SeatClaimed = "seat_claimed",
   RefundRequestDecided = "refund_request_decided",
   RefundRequested = "refund_requested",
+  CommentReplied = "comment_replied",
+  QuestionPosted = "question_posted",
 }
 
 // ─── Tables ───
