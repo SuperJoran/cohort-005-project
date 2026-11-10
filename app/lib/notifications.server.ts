@@ -40,7 +40,19 @@ type RefundRequestDecided = {
   note: string | null;
 };
 
-export type NotificationEvent = SeatClaimed | RefundRequestDecided;
+/** A buyer raised a new Open Refund Request. */
+type RefundRequested = {
+  kind: NotificationKind.RefundRequested;
+  buyerId: number;
+  buyerName: string;
+  courseTitle: string;
+  platformAdminIds: number[];
+};
+
+export type NotificationEvent =
+  | SeatClaimed
+  | RefundRequestDecided
+  | RefundRequested;
 
 /**
  * Writes the Notifications an event causes and returns its Emails. Never
@@ -52,6 +64,8 @@ export function notify(tx: Queryable, event: NotificationEvent): Email[] {
       return notifySeatClaimed(tx, event);
     case NotificationKind.RefundRequestDecided:
       return notifyRefundRequestDecided(tx, event);
+    case NotificationKind.RefundRequested:
+      return notifyRefundRequested(tx, event);
   }
 }
 
@@ -217,4 +231,25 @@ export function markAllNotificationsRead(db: Queryable, recipientId: number) {
     .set({ readAt: new Date().toISOString() })
     .where(isUnreadFor(recipientId))
     .run();
+}
+
+function notifyRefundRequested(tx: Queryable, event: RefundRequested): Email[] {
+  const recipientIds = event.platformAdminIds.filter(
+    (id) => id !== event.buyerId
+  );
+  if (recipientIds.length > 0) {
+    tx.insert(notifications)
+      .values(
+        recipientIds.map((recipientId) => ({
+          recipientId,
+          kind: event.kind,
+          text: `${event.buyerName} requested a Refund for ${event.courseTitle}`,
+          link: "/admin/refunds",
+        }))
+      )
+      .run();
+  }
+  // The Platform Admins' Re-engagement Email arrives with the pending_emails
+  // sweeper, not here.
+  return [];
 }
