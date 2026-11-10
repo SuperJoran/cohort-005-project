@@ -13,4 +13,17 @@ Re-engagement Emails (reply, new top-level comment, new Open Refund Request) are
 
 - **Leaving one process.** Running two processes would run two sweepers. Rows would have to be claimed atomically before sending, or the sweeper moved to a single worker.
 - **Late, not lost.** While the server is down, due Emails wait, and they go out on the first sweep after startup.
-- **Batching.** Pending rows are where Emails to the same Recipient can be grouped later ("How are bursts of Emails batched?").
+- **Emails can arrive up to about 75 minutes late.** That's because of the batching cooldown below. The Notification in the app is still live.
+
+## Batching
+
+When the sweeper sends a due row, it also takes every other pending row for the same Recipient and **kind**, including rows that aren't due yet, and sends them as one Email. Rows the Recipient has turned off are dropped before grouping. After a **successful** send, that Recipient gets no other Email of that kind for **1 hour** (one constant, like the 15-minute delay). Rows that come due during that hour wait and go out together when it ends. The cooldown is worked out from the newest sent row for that Recipient and kind, so there's no extra table. A failed send counts an attempt for every row in the batch. On the next sweep the rows are grouped again, and the retry may include more items.
+
+The Email's subject is a count and the kind ("3 new replies to your comments"). The body has one linked line per item, newest first and at most 10, then "and N more", which links into the app. A batch of one reads like a single Email. Links are plain and don't mark the Notification read. The footer has the one-kind unsubscribe link from ADR 0015.
+
+### Considered Options
+
+- **One Email per event.** Rejected: a burst of 20 replies means 20 Emails, and that pushes people to "report spam".
+- **One mixed digest per Recipient across kinds.** Rejected: one unsubscribe link (ADR 0015) and one `List-Unsubscribe` header can only cover one kind.
+- **Debounce (every new row pushes the send back).** Rejected: a steady trickle would never send without adding a maximum wait.
+- **Pull forward with no cooldown.** Rejected: a trickle still means an Email every 15 minutes.
