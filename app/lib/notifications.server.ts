@@ -12,6 +12,10 @@ import { formatPrice } from "~/lib/utils";
 // and returns the Emails the caller sends once the transaction is saved.
 // See GLOSSARY.md and the "Wayfinder: In-app notifications" map.
 //
+// The unread count is also pushed live (ADR 0013): `notify` and the reads queue
+// a push for the Recipients they touched, and the push goes out after the
+// surrounding transaction commits. Callers of `notify` get this for free.
+//
 // Every function takes the database first, so tests can hand in an in-memory
 // one. Uses positional parameters (project convention).
 
@@ -144,6 +148,7 @@ function notifySeatClaimed(tx: Queryable, event: SeatClaimed): Email[] {
       )
       .run();
   }
+  queueUnreadCountPush(tx, recipientIds);
   // Seat claimed is Notification only: it is just information.
   return [];
 }
@@ -194,6 +199,50 @@ function buildDecisionEmail(event: RefundRequestDecided): Email {
   };
 }
 
+// ─── Live unread count ───
+// An in-process emitter (ADR 0013): it only works because Cadence is one server
+// process (ADR 0006). The SSE stream route subscribes per visible tab.
+
+type UnreadCountListener = (unreadCount: number) => void;
+
+const listenersByRecipient = new Map<number, Set<UnreadCountListener>>();
+
+/** Calls the listener with the Recipient's unread count whenever it changes. Returns the unsubscribe. */
+export function subscribeToUnreadCount(
+  recipientId: number,
+  listener: UnreadCountListener
+) {
+  let listeners = listenersByRecipient.get(recipientId);
+  if (!listeners) {
+    listeners = new Set();
+    listenersByRecipient.set(recipientId, listeners);
+  }
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) listenersByRecipient.delete(recipientId);
+  };
+}
+
+/**
+ * Pushes the Recipients' unread counts once the current transaction is over.
+ * better-sqlite3 transactions are synchronous, so a microtask always runs after
+ * the commit (or rollback): the count it reads is the saved one, never a
+ * half-done one. A rolled-back event pushes an unchanged count, which is harmless.
+ */
+function queueUnreadCountPush(db: Queryable, recipientIds: number[]) {
+  const listened = recipientIds.filter((id) => listenersByRecipient.has(id));
+  if (listened.length === 0) return;
+  queueMicrotask(() => {
+    for (const recipientId of new Set(listened)) {
+      const listeners = listenersByRecipient.get(recipientId);
+      if (!listeners) continue;
+      const unreadCount = countUnread(db, recipientId);
+      for (const listener of listeners) listener(unreadCount);
+    }
+  });
+}
+
 export type FeedItem = {
   id: number;
   text: string;
@@ -239,14 +288,20 @@ function isUnreadFor(recipientId: number) {
   );
 }
 
-/** What the sidebar's "For you" section shows: the unread count and the newest unread. */
-export function getNotificationFeed(db: Queryable, recipientId: number) {
-  const unreadCount =
+/** How many unread Notifications the Recipient has. */
+export function countUnread(db: Queryable, recipientId: number): number {
+  return (
     db
       .select({ count: sql<number>`count(*)` })
       .from(notifications)
       .where(isUnreadFor(recipientId))
-      .get()?.count ?? 0;
+      .get()?.count ?? 0
+  );
+}
+
+/** What the sidebar's "For you" section shows: the unread count and the newest unread. */
+export function getNotificationFeed(db: Queryable, recipientId: number) {
+  const unreadCount = countUnread(db, recipientId);
 
   const latestUnread = selectFeedItems(db)
     .where(isUnreadFor(recipientId))
@@ -276,20 +331,24 @@ export function markNotificationRead(
   recipientId: number,
   notificationId: number
 ) {
-  db.update(notifications)
+  const { changes } = db
+    .update(notifications)
     .set({ readAt: new Date().toISOString() })
     .where(
       and(isUnreadFor(recipientId), eq(notifications.id, notificationId))
     )
     .run();
+  if (changes > 0) queueUnreadCountPush(db, [recipientId]);
 }
 
 /** Marks every unread Notification of the Recipient read. */
 export function markAllNotificationsRead(db: Queryable, recipientId: number) {
-  db.update(notifications)
+  const { changes } = db
+    .update(notifications)
     .set({ readAt: new Date().toISOString() })
     .where(isUnreadFor(recipientId))
     .run();
+  if (changes > 0) queueUnreadCountPush(db, [recipientId]);
 }
 
 function notifyRefundRequested(tx: Queryable, event: RefundRequested): Email[] {

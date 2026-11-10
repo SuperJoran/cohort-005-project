@@ -1,11 +1,14 @@
-import { useState } from "react";
-import { Link, useFetcher } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { Link, useFetcher, useRevalidator } from "react-router";
 import { CheckCheck } from "lucide-react";
 import { cn, formatRelativeTime } from "~/lib/utils";
 
 // The sidebar's "For you" section: the unread count, the 3 newest unread
 // Notifications, and "See all" to expand the full list in place. Following a
 // Notification marks it read. There is no dismiss and no grouping.
+// The badge is live (ADR 0013): while the tab is visible it holds one
+// EventSource on the stream route, shows each pushed count at once and
+// revalidates so the feed catches up. Quiet badge, no toast.
 
 export interface FeedItem {
   id: number;
@@ -21,6 +24,60 @@ export interface NotificationFeedData {
 }
 
 const NOTIFICATIONS_ROUTE = "/api/notifications";
+const STREAM_ROUTE = "/api/notifications/stream";
+
+/**
+ * The unread count, kept live by the stream while the tab is visible. A hidden
+ * tab closes its stream (browsers allow only 6 HTTP/1.1 connections per domain
+ * across tabs) and reopens it when visible again; the server sends the current
+ * count first on every connect, so nothing missed needs replaying.
+ */
+function useLiveUnreadCount(loadedCount: number) {
+  const [liveCount, setLiveCount] = useState<number | null>(null);
+  const loadedCountRef = useRef(loadedCount);
+  const { revalidate } = useRevalidator();
+  const revalidateRef = useRef(revalidate);
+  revalidateRef.current = revalidate;
+
+  useEffect(() => {
+    loadedCountRef.current = loadedCount;
+    setLiveCount(null);
+  }, [loadedCount]);
+
+  useEffect(() => {
+    let source: EventSource | null = null;
+
+    function open() {
+      if (source) return;
+      source = new EventSource(STREAM_ROUTE);
+      source.onmessage = (event) => {
+        const count = Number(event.data);
+        if (!Number.isFinite(count)) return;
+        setLiveCount(count);
+        if (count !== loadedCountRef.current) void revalidateRef.current();
+      };
+    }
+
+    function close() {
+      source?.close();
+      source = null;
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") open();
+      else close();
+    }
+
+    onVisibilityChange();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      close();
+    };
+  }, []);
+
+  return liveCount ?? loadedCount;
+}
 
 function CountBadge({ count }: { count: number }) {
   if (count === 0) return null;
@@ -36,6 +93,7 @@ function CountBadge({ count }: { count: number }) {
 
 export function NotificationFeed({ feed }: { feed: NotificationFeedData }) {
   const [showAll, setShowAll] = useState(false);
+  const unreadCount = useLiveUnreadCount(feed.unreadCount);
   const allFetcher = useFetcher<{ notifications: FeedItem[] }>();
   const markFetcher = useFetcher();
 
@@ -66,8 +124,8 @@ export function NotificationFeed({ feed }: { feed: NotificationFeedData }) {
     <div className="border-t border-sidebar-border p-3">
       <div className="mb-2 flex items-center px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
         For you
-        <CountBadge count={feed.unreadCount} />
-        {feed.unreadCount > 0 && (
+        <CountBadge count={unreadCount} />
+        {unreadCount > 0 && (
           <button
             type="button"
             onClick={markAllRead}
