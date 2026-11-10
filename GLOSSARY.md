@@ -99,6 +99,18 @@ _Avoid_: Watch cap, Viewing threshold
 A message Cadence keeps for one person inside the app about something that happened that concerns them. It is separate from an Email, which reaches people outside the app.
 _Avoid_: Alert, Message, Inbox item
 
+**Email**:
+A message Cadence sends to someone's inbox, outside the app, to tell them something happened or bring them back.
+_Avoid_: Mail
+
+**Transactional Email**:
+An Email about the person's own Purchase or Refund Request. It always arrives and can't be turned off.
+_Avoid_: System email, Receipt (for the whole group)
+
+**Re-engagement Email**:
+An Email that brings a Recipient back into Cadence because there's something for them to do or read. The Recipient can turn each kind off.
+_Avoid_: Marketing email, Newsletter, Notification email
+
 **Recipient**:
 The one person a Notification is for.
 _Avoid_: Receiver, Target, Subscriber
