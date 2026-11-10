@@ -136,19 +136,15 @@ function notifySeatClaimed(tx: Queryable, event: SeatClaimed): Email[] {
   const recipientIds = event.teamAdminIds.filter(
     (id) => id !== event.claimerId
   );
-  if (recipientIds.length > 0) {
-    tx.insert(notifications)
-      .values(
-        recipientIds.map((recipientId) => ({
-          recipientId,
-          kind: event.kind,
-          text: `${event.claimerName} claimed a Seat on ${event.courseTitle}`,
-          link: "/team",
-        }))
-      )
-      .run();
-  }
-  queueUnreadCountPush(tx, recipientIds);
+  insertNotifications(
+    tx,
+    recipientIds.map((recipientId) => ({
+      recipientId,
+      kind: event.kind,
+      text: `${event.claimerName} claimed a Seat on ${event.courseTitle}`,
+      link: "/team",
+    }))
+  );
   // Seat claimed is Notification only: it is just information.
   return [];
 }
@@ -158,14 +154,14 @@ function notifyRefundRequestDecided(
   event: RefundRequestDecided
 ): Email[] {
   if (event.buyer.id !== event.platformAdminId) {
-    tx.insert(notifications)
-      .values({
+    insertNotifications(tx, [
+      {
         recipientId: event.buyer.id,
         kind: event.kind,
         text: `Your Refund Request for ${event.course.title} was ${event.decision}`,
         link: `/courses/${event.course.slug}`,
-      })
-      .run();
+      },
+    ]);
   }
   // A Transactional Email: it always goes, sent as soon as the decision is saved.
   return [buildDecisionEmail(event)];
@@ -197,6 +193,23 @@ function buildDecisionEmail(event: RefundRequestDecided): Email {
       "\n"
     ),
   };
+}
+
+/**
+ * The one way to write Notifications: inserts the rows and queues a live
+ * unread count push to their Recipients for after the transaction commits.
+ * Every per-kind `notifyX` function writes through here, so every event is live.
+ */
+function insertNotifications(
+  tx: Queryable,
+  rows: (typeof notifications.$inferInsert)[]
+) {
+  if (rows.length === 0) return;
+  tx.insert(notifications).values(rows).run();
+  queueUnreadCountPush(
+    tx,
+    rows.map((row) => row.recipientId)
+  );
 }
 
 // ─── Live unread count ───

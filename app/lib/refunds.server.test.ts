@@ -14,7 +14,10 @@ import {
   listTeamLicences,
   raiseRefundRequest,
 } from "./refunds.server";
-import { getNotificationFeed } from "./notifications.server";
+import {
+  getNotificationFeed,
+  subscribeToUnreadCount,
+} from "./notifications.server";
 
 type TestDb = ReturnType<typeof createTestDb>;
 
@@ -459,6 +462,24 @@ describe("notifying the buyer of the decision", () => {
         read: false,
       }),
     ]);
+  });
+
+  it("pushes the buyer's new unread count live once the decision is saved", async () => {
+    const purchase = buyForSelf(base.user.id);
+    const id = raise(purchase.id, base.user.id);
+    const pushed: number[] = [];
+    const unsubscribe = subscribeToUnreadCount(base.user.id, (count) =>
+      pushed.push(count)
+    );
+
+    try {
+      approveRefundRequest(db, id, platformAdmin.id, null, NOW);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(pushed).toEqual([1]);
+    } finally {
+      unsubscribe();
+    }
   });
 
   it("tells the buyer their Refund Request was declined", () => {
