@@ -90,6 +90,10 @@ export function postComment(
       .get();
 
     if (parent) {
+      // A deleted top-level comment's author has left the thread: a reply to
+      // it notifies no one.
+      if (parent.deletedAt !== null) return comment;
+
       const replier = tx.select().from(users).where(eq(users.id, userId)).get()!;
       notify(tx, {
         kind: NotificationKind.CommentReplied,

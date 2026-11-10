@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { createTestDb, seedBaseData } from "~/test/setup";
 import * as schema from "~/db/schema";
 import { UserRole } from "~/db/schema";
@@ -97,6 +98,20 @@ describe("replying to a comment", () => {
     expect(feedOf(instructorId).map(({ text }) => text)).toEqual([
       "Ann replied to your comment on Hooks",
     ]);
+  });
+
+  it("notifies no one when the top-level comment is deleted", () => {
+    const ann = addStudent("Ann");
+    const ben = addStudent("Ben");
+    const question = postComment(db, ann.id, lessonId, null, "How?");
+    db.update(schema.comments)
+      .set({ deletedAt: new Date().toISOString() })
+      .where(eq(schema.comments.id, question.id))
+      .run();
+
+    postComment(db, ben.id, lessonId, question.id, "Like this.");
+
+    expect(feedOf(ann.id)).toEqual([]);
   });
 
   it("never quotes the comment body", () => {
