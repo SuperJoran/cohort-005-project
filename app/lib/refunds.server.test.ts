@@ -281,6 +281,24 @@ describe("notifying Platform Admins of a new Open Refund Request", () => {
     expect(feedOf(coAdmin.id)).toEqual(expected);
   });
 
+  it("pushes each Platform Admin's new unread count live", async () => {
+    const coAdmin = addPlatformAdmin("Quinn");
+    const purchase = buyForSelf(base.user.id);
+    const pushed: number[] = [];
+    const unsubscribers = [platformAdmin.id, coAdmin.id].map((id) =>
+      subscribeToUnreadCount(id, (count) => pushed.push(count))
+    );
+
+    try {
+      raise(purchase.id, base.user.id);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(pushed).toEqual([1, 1]);
+    } finally {
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    }
+  });
+
   it("notifies no one but Platform Admins, and not the buyer", () => {
     const purchase = buyForSelf(base.user.id);
 

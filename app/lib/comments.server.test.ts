@@ -4,7 +4,10 @@ import { createTestDb, seedBaseData } from "~/test/setup";
 import * as schema from "~/db/schema";
 import { UserRole } from "~/db/schema";
 import { postComment } from "./comments.server";
-import { getNotificationFeed } from "./notifications.server";
+import {
+  getNotificationFeed,
+  subscribeToUnreadCount,
+} from "./notifications.server";
 
 type TestDb = ReturnType<typeof createTestDb>;
 
@@ -23,6 +26,20 @@ function addStudent(name: string) {
     })
     .returning()
     .get();
+}
+
+async function pushesTo(userId: number, act: () => void) {
+  const pushed: number[] = [];
+  const unsubscribe = subscribeToUnreadCount(userId, (count) =>
+    pushed.push(count)
+  );
+  try {
+    act();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return pushed;
+  } finally {
+    unsubscribe();
+  }
 }
 
 function feedOf(userId: number) {
@@ -62,6 +79,18 @@ describe("replying to a comment", () => {
         link: `/courses/test-course/lessons/${lessonId}#comment-${question.id}`,
       },
     ]);
+  });
+
+  it("pushes the comment author's new unread count live", async () => {
+    const ann = addStudent("Ann");
+    const ben = addStudent("Ben");
+    const question = postComment(db, ann.id, lessonId, null, "How?");
+
+    const pushed = await pushesTo(ann.id, () =>
+      postComment(db, ben.id, lessonId, question.id, "Like this.")
+    );
+
+    expect(pushed).toEqual([1]);
   });
 
   it("never notifies someone replying to their own comment", () => {
@@ -140,6 +169,16 @@ describe("posting a new top-level comment", () => {
         link: "/instructor/questions",
       },
     ]);
+  });
+
+  it("pushes the Instructor's new unread count live", async () => {
+    const ann = addStudent("Ann");
+
+    const pushed = await pushesTo(instructorId, () =>
+      postComment(db, ann.id, lessonId, null, "How?")
+    );
+
+    expect(pushed).toEqual([1]);
   });
 
   it("doesn't notify the Instructor about their own comment", () => {

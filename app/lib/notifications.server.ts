@@ -104,14 +104,14 @@ export function notify(tx: Queryable, event: NotificationEvent): Email[] {
 // Comment snapshots never quote the comment body.
 function notifyCommentReplied(tx: Queryable, event: CommentReplied): Email[] {
   if (event.commentAuthorId !== event.replierId) {
-    tx.insert(notifications)
-      .values({
+    insertNotifications(tx, [
+      {
         recipientId: event.commentAuthorId,
         kind: event.kind,
         text: `${event.replierName} replied to your comment on ${event.lessonTitle}`,
         link: event.threadLink,
-      })
-      .run();
+      },
+    ]);
   }
   // Its Re-engagement Email arrives with the pending_emails sweeper.
   return [];
@@ -119,14 +119,14 @@ function notifyCommentReplied(tx: Queryable, event: CommentReplied): Email[] {
 
 function notifyQuestionPosted(tx: Queryable, event: QuestionPosted): Email[] {
   if (event.instructorId !== event.authorId) {
-    tx.insert(notifications)
-      .values({
+    insertNotifications(tx, [
+      {
         recipientId: event.instructorId,
         kind: event.kind,
         text: `New question on ${event.lessonTitle} in ${event.courseTitle}`,
         link: "/instructor/questions",
-      })
-      .run();
+      },
+    ]);
   }
   // Its Re-engagement Email arrives with the pending_emails sweeper.
   return [];
@@ -368,18 +368,15 @@ function notifyRefundRequested(tx: Queryable, event: RefundRequested): Email[] {
   const recipientIds = event.platformAdminIds.filter(
     (id) => id !== event.buyerId
   );
-  if (recipientIds.length > 0) {
-    tx.insert(notifications)
-      .values(
-        recipientIds.map((recipientId) => ({
-          recipientId,
-          kind: event.kind,
-          text: `${event.buyerName} requested a Refund for ${event.courseTitle}`,
-          link: "/admin/refunds",
-        }))
-      )
-      .run();
-  }
+  insertNotifications(
+    tx,
+    recipientIds.map((recipientId) => ({
+      recipientId,
+      kind: event.kind,
+      text: `${event.buyerName} requested a Refund for ${event.courseTitle}`,
+      link: "/admin/refunds",
+    }))
+  );
   // The Platform Admins' Re-engagement Email arrives with the pending_emails
   // sweeper, not here.
   return [];
