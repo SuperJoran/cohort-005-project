@@ -15,8 +15,10 @@ import {
   videoWatchEvents,
   LessonProgressStatus,
   RefundStatus,
+  NotificationKind,
 } from "~/db/schema";
 import { formatPrice } from "~/lib/utils";
+import { notify } from "~/lib/notifications.server";
 import {
   REFUND_COMPLETION_LIMIT,
   REFUND_WATCH_LIMIT_SECONDS,
@@ -677,10 +679,14 @@ export function approveRefundRequest(
       .where(eq(refunds.id, refundRequestId))
       .run();
 
-    return {
-      ok: true,
-      email: buildDecisionEmail(tx, purchase, RefundStatus.Approved, note),
-    };
+    const [email] = notifyDecision(
+      tx,
+      purchase,
+      RefundStatus.Approved,
+      platformAdminId,
+      note
+    );
+    return { ok: true, email };
   });
 }
 
@@ -720,62 +726,43 @@ export function declineRefundRequest(
       .where(eq(refunds.id, refundRequestId))
       .run();
 
-    return {
-      ok: true,
-      email: buildDecisionEmail(
-        tx,
-        found.purchase,
-        RefundStatus.Declined,
-        trimmedNote
-      ),
-    };
+    const [email] = notifyDecision(
+      tx,
+      found.purchase,
+      RefundStatus.Declined,
+      platformAdminId,
+      trimmedNote
+    );
+    return { ok: true, email };
   });
 }
 
-/** The email the buyer gets once their Refund Request is decided. */
-function buildDecisionEmail(
-  db: Queryable,
+/** Tells the buyer about the decision; returns the decision Email to send. */
+function notifyDecision(
+  tx: Queryable,
   purchase: Purchase,
   decision: RefundStatus.Approved | RefundStatus.Declined,
+  platformAdminId: number,
   note: string | null
-): Email {
-  const buyer = db
+): Email[] {
+  const buyer = tx
     .select()
     .from(users)
     .where(eq(users.id, purchase.userId))
-    .get();
-  const course = db
+    .get()!;
+  const course = tx
     .select()
     .from(courses)
     .where(eq(courses.id, purchase.courseId))
-    .get();
+    .get()!;
 
-  const courseTitle = course?.title ?? "your course";
-  const noteLines = note ? ["", note] : [];
-
-  const middle =
-    decision === RefundStatus.Approved
-      ? [
-          `We have approved your refund request for "${courseTitle}".`,
-          `${formatPrice(purchase.amountPaid)}, the full amount you paid, is on its way back to you.`,
-          ...noteLines,
-        ]
-      : [
-          `We have looked at your refund request for "${courseTitle}" and decided not to refund it.`,
-          ...noteLines,
-          "",
-          "You still have everything you bought. If something changes, you can raise a new refund request.",
-        ];
-
-  return {
-    to: buyer?.email ?? "",
-    subject: `Refund ${decision} — ${courseTitle}`,
-    body: [
-      `Hi ${buyer?.name ?? "there"},`,
-      "",
-      ...middle,
-      "",
-      "— The Cadence team",
-    ].join("\n"),
-  };
+  return notify(tx, {
+    kind: NotificationKind.RefundRequestDecided,
+    decision,
+    platformAdminId,
+    buyer: { id: buyer.id, name: buyer.name, email: buyer.email },
+    course: { title: course.title, slug: course.slug },
+    amountPaid: purchase.amountPaid,
+    note,
+  });
 }
