@@ -4,6 +4,10 @@ import { cn } from "~/lib/utils";
 import { UserRole } from "~/db/schema";
 import { UserAvatar } from "~/components/user-avatar";
 import {
+  NotificationFeed,
+  type NotificationFeedData,
+} from "~/components/notification-feed";
+import {
   BookOpen,
   ChartColumn,
   LayoutDashboard,
@@ -41,6 +45,7 @@ interface SidebarProps {
   currentUser: CurrentUser | null;
   recentCourses?: RecentCourse[];
   isTeamAdmin?: boolean;
+  notificationFeed?: NotificationFeedData | null;
 }
 
 interface NavItem {
@@ -117,6 +122,7 @@ export function Sidebar({
   currentUser,
   recentCourses = [],
   isTeamAdmin = false,
+  notificationFeed = null,
 }: SidebarProps) {
   const currentUserRole = currentUser?.role ?? null;
   const [isDark, setIsDark] = useState(false);
@@ -179,6 +185,8 @@ export function Sidebar({
           </NavLink>
         )}
       </nav>
+
+      {notificationFeed && <NotificationFeed feed={notificationFeed} />}
 
       {recentCourses.length > 0 && (
         <div className="border-t border-sidebar-border p-3">

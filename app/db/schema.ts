@@ -42,6 +42,10 @@ export enum TeamMemberRole {
   Member = "member",
 }
 
+export enum NotificationKind {
+  SeatClaimed = "seat_claimed",
+}
+
 // ─── Tables ───
 
 export const users = sqliteTable("users", {
@@ -374,3 +378,27 @@ export const videoWatchEvents = sqliteTable("video_watch_events", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
 });
+
+// A Notification is a snapshot for one Recipient: who did what and where. It
+// never quotes a comment body, so later edits and deletes can't leave stale or
+// leaked text in it. The link goes to wherever the thing is now.
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    recipientId: integer("recipient_id")
+      .notNull()
+      .references(() => users.id),
+    kind: text("kind").notNull().$type<NotificationKind>(),
+    text: text("text").notNull(),
+    link: text("link").notNull(),
+    // Null while unread.
+    readAt: text("read_at"),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    index("notifications_recipient_idx").on(table.recipientId, table.createdAt),
+  ]
+);

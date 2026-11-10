@@ -13,6 +13,7 @@ import {
   RefundStatus,
   QuestionType,
   TeamMemberRole,
+  NotificationKind,
 } from "../app/db/schema";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -65,6 +66,7 @@ async function seed() {
 
   // Drop and recreate tables for a clean seed
   sqlite.exec(`
+    DROP TABLE IF EXISTS notifications;
     DROP TABLE IF EXISTS comments;
     DROP TABLE IF EXISTS course_ratings;
     DROP TABLE IF EXISTS video_watch_events;
@@ -2351,6 +2353,28 @@ This course is still in draft while the cluster examples are rewritten against t
       redeemedAt: daysAgo(25),
     })
     .where(eq(schema.coupons.id, seededCoupons[1].id))
+    .run();
+
+  // Bossy was notified of both claims: the older one is read, the newer one
+  // is still unread, so the sidebar's "For you" feed has something to show.
+  db.insert(schema.notifications)
+    .values([
+      {
+        recipientId: bossy.id,
+        kind: NotificationKind.SeatClaimed,
+        text: `${studentByEmail("olivia.martinez@student.dev").name} claimed a Seat on ${course2.title}`,
+        link: "/team",
+        readAt: daysAgo(29),
+        createdAt: daysAgo(30),
+      },
+      {
+        recipientId: bossy.id,
+        kind: NotificationKind.SeatClaimed,
+        text: `${studentByEmail("liam@example.com").name} claimed a Seat on ${course2.title}`,
+        link: "/team",
+        createdAt: daysAgo(25),
+      },
+    ])
     .run();
 
   console.log(
