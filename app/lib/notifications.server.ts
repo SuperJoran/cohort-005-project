@@ -1,8 +1,9 @@
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import * as schema from "~/db/schema";
-import { NotificationKind, notifications } from "~/db/schema";
+import { NotificationKind, RefundStatus, notifications } from "~/db/schema";
 import type { Email } from "~/lib/mailer.server";
+import { formatPrice } from "~/lib/utils";
 
 // ─── Notifications ───
 // A Notification is a message Cadence keeps for one Recipient inside the app.
@@ -18,7 +19,7 @@ export type Db = BetterSQLite3Database<typeof schema>;
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type Queryable = Db | Tx;
 
-export type NotificationEvent = {
+type SeatClaimed = {
   kind: NotificationKind.SeatClaimed;
   claimerId: number;
   claimerName: string;
@@ -26,11 +27,35 @@ export type NotificationEvent = {
   teamAdminIds: number[];
 };
 
+/** A Platform Admin approved or declined a Refund Request. */
+type RefundRequestDecided = {
+  kind: NotificationKind.RefundRequestDecided;
+  decision: RefundStatus.Approved | RefundStatus.Declined;
+  platformAdminId: number;
+  // The buyer: the Student of an Individual Purchase or the Team Admin of a
+  // Team Licence.
+  buyer: { id: number; name: string; email: string };
+  course: { title: string; slug: string };
+  amountPaid: number;
+  note: string | null;
+};
+
+export type NotificationEvent = SeatClaimed | RefundRequestDecided;
+
 /**
  * Writes the Notifications an event causes and returns its Emails. Never
  * notifies someone about their own action.
  */
 export function notify(tx: Queryable, event: NotificationEvent): Email[] {
+  switch (event.kind) {
+    case NotificationKind.SeatClaimed:
+      return notifySeatClaimed(tx, event);
+    case NotificationKind.RefundRequestDecided:
+      return notifyRefundRequestDecided(tx, event);
+  }
+}
+
+function notifySeatClaimed(tx: Queryable, event: SeatClaimed): Email[] {
   const recipientIds = event.teamAdminIds.filter(
     (id) => id !== event.claimerId
   );
@@ -48,6 +73,52 @@ export function notify(tx: Queryable, event: NotificationEvent): Email[] {
   }
   // Seat claimed is Notification only: it is just information.
   return [];
+}
+
+function notifyRefundRequestDecided(
+  tx: Queryable,
+  event: RefundRequestDecided
+): Email[] {
+  if (event.buyer.id !== event.platformAdminId) {
+    tx.insert(notifications)
+      .values({
+        recipientId: event.buyer.id,
+        kind: event.kind,
+        text: `Your Refund Request for ${event.course.title} was ${event.decision}`,
+        link: `/courses/${event.course.slug}`,
+      })
+      .run();
+  }
+  // A Transactional Email: it always goes, sent as soon as the decision is saved.
+  return [buildDecisionEmail(event)];
+}
+
+/** The Email the buyer gets once their Refund Request is decided. */
+function buildDecisionEmail(event: RefundRequestDecided): Email {
+  const { buyer, course, decision, note } = event;
+  const noteLines = note ? ["", note] : [];
+
+  const middle =
+    decision === RefundStatus.Approved
+      ? [
+          `We have approved your refund request for "${course.title}".`,
+          `${formatPrice(event.amountPaid)}, the full amount you paid, is on its way back to you.`,
+          ...noteLines,
+        ]
+      : [
+          `We have looked at your refund request for "${course.title}" and decided not to refund it.`,
+          ...noteLines,
+          "",
+          "You still have everything you bought. If something changes, you can raise a new refund request.",
+        ];
+
+  return {
+    to: buyer.email,
+    subject: `Refund ${decision} — ${course.title}`,
+    body: [`Hi ${buyer.name},`, "", ...middle, "", "— The Cadence team"].join(
+      "\n"
+    ),
+  };
 }
 
 export type FeedItem = {

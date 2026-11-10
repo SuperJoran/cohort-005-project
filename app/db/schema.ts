@@ -44,6 +44,7 @@ export enum TeamMemberRole {
 
 export enum NotificationKind {
   SeatClaimed = "seat_claimed",
+  RefundRequestDecided = "refund_request_decided",
 }
 
 // ─── Tables ───
