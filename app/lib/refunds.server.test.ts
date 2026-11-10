@@ -238,6 +238,75 @@ describe("raising a Refund Request", () => {
   });
 });
 
+describe("notifying Platform Admins of a new Open Refund Request", () => {
+  function addPlatformAdmin(name: string) {
+    return db
+      .insert(schema.users)
+      .values({
+        name,
+        email: `${name.toLowerCase()}@example.com`,
+        role: UserRole.Admin,
+      })
+      .returning()
+      .get();
+  }
+
+  function feedOf(userId: number) {
+    const feed = getNotificationFeed(db, userId);
+    return {
+      unreadCount: feed.unreadCount,
+      latestUnread: feed.latestUnread.map(({ text, link }) => ({ text, link })),
+    };
+  }
+
+  it("notifies every Platform Admin, one Notification each, linking to the review page", () => {
+    const coAdmin = addPlatformAdmin("Quinn");
+    const purchase = buyForSelf(base.user.id);
+
+    raise(purchase.id, base.user.id);
+
+    const expected = {
+      unreadCount: 1,
+      latestUnread: [
+        {
+          text: "Test User requested a Refund for Test Course",
+          link: "/admin/refunds",
+        },
+      ],
+    };
+    expect(feedOf(platformAdmin.id)).toEqual(expected);
+    expect(feedOf(coAdmin.id)).toEqual(expected);
+  });
+
+  it("notifies no one but Platform Admins, and not the buyer", () => {
+    const purchase = buyForSelf(base.user.id);
+
+    raise(purchase.id, base.user.id);
+
+    expect(feedOf(base.user.id).unreadCount).toBe(0);
+    expect(feedOf(base.instructor.id).unreadCount).toBe(0);
+  });
+
+  it("notifies no one when the Refund Request is refused", () => {
+    const purchase = buyForSelf(base.user.id, 15);
+
+    const result = raiseRefundRequest(db, purchase.id, base.user.id, "Nope.", NOW);
+
+    expect(result.ok).toBe(false);
+    expect(feedOf(platformAdmin.id).unreadCount).toBe(0);
+  });
+
+  it("leaves the other Platform Admins' Notifications unread when one decides", () => {
+    const coAdmin = addPlatformAdmin("Quinn");
+    const purchase = buyForSelf(base.user.id);
+    const refundRequestId = raise(purchase.id, base.user.id);
+
+    declineRefundRequest(db, refundRequestId, platformAdmin.id, "No.", NOW);
+
+    expect(feedOf(coAdmin.id).unreadCount).toBe(1);
+  });
+});
+
 describe("the refund offer on the course page", () => {
   it("offers the newest Individual Purchase, not a newer Team Licence", () => {
     const individual = buyForSelf(base.user.id, 3);
@@ -416,7 +485,11 @@ describe("notifying the buyer of the decision", () => {
     expect(texts(getNotificationFeed(db, priya.id).latestUnread)).toEqual([
       "Your Refund Request for Test Course was approved",
     ]);
-    expect(getNotificationFeed(db, platformAdmin.id).unreadCount).toBe(0);
+    // The deciding Platform Admin only has the Notification that the
+    // Refund Request was raised, none about the decision.
+    expect(texts(getNotificationFeed(db, platformAdmin.id).latestUnread)).toEqual([
+      "Priya requested a Refund for Test Course",
+    ]);
   });
 
   it("does not notify a Platform Admin who decides their own Refund Request, but still emails them", () => {
