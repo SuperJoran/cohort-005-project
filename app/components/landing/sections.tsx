@@ -214,7 +214,15 @@ export function CallToActionSection({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-export function LandingFooter() {
+function FooterLink({ to, children }: { to: string; children: string }) {
+  return (
+    <Link to={to} className="text-muted-foreground hover:text-foreground">
+      {children}
+    </Link>
+  );
+}
+
+export function LandingFooter({ signedIn }: { signedIn: boolean }) {
   return (
     <footer className="border-t border-border">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-12 sm:flex-row sm:justify-between">
@@ -229,33 +237,18 @@ export function LandingFooter() {
         <nav className="flex gap-12 text-sm">
           <div className="flex flex-col gap-2">
             <p className="font-medium">Learn</p>
-            <Link
-              to="/courses"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              All courses
-            </Link>
-            <Link
-              to="/dashboard"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Dashboard
-            </Link>
+            <FooterLink to="/courses">All courses</FooterLink>
           </div>
           <div className="flex flex-col gap-2">
             <p className="font-medium">Account</p>
-            <Link
-              to="/login"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Log in
-            </Link>
-            <Link
-              to="/signup"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Sign up
-            </Link>
+            {signedIn ? (
+              <FooterLink to="/dashboard">Dashboard</FooterLink>
+            ) : (
+              <>
+                <FooterLink to="/login">Log in</FooterLink>
+                <FooterLink to="/signup">Sign up</FooterLink>
+              </>
+            )}
           </div>
         </nav>
       </div>
