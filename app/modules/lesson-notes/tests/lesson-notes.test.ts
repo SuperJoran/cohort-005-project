@@ -20,7 +20,10 @@ describe("noteDraft", () => {
   it("cannot save an empty or whitespace-only draft", () => {
     expect(noteDraft("", null).canSave).toBe(false);
     expect(noteDraft("   \n", null).canSave).toBe(false);
-    expect(noteDraft("   \n", "saved").unsaved).toBe(true);
+    expect(noteDraft("   \n", "saved")).toMatchObject({
+      unsaved: true,
+      canSave: false,
+    });
   });
 
   it("cannot save a draft identical to the saved note", () => {
