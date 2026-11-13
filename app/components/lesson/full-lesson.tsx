@@ -113,7 +113,7 @@ function LessonMedia({ data }: { data: FullLessonData }) {
       )}
 
       {/* Note — under the video, so the Student can write while they watch */}
-      {currentUserId && <LessonNote note={data.note} />}
+      {currentUserId && <LessonNote key={lesson.id} note={data.note} />}
 
       {contentHtml && (
         <div
