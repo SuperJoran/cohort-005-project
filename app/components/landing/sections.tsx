@@ -17,7 +17,7 @@ import {
 } from "~/components/ui/card";
 import { CourseImage } from "~/components/course-image";
 import type { FeaturedCourse, Topic } from "~/modules/landing/index.server";
-import { plural } from "./hero";
+import { plural } from "~/lib/utils";
 
 function SectionHeading({
   eyebrow,

@@ -2,14 +2,11 @@ import { Link } from "react-router";
 import { ArrowRight, BookOpen, Sparkles, Users } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { CourseImage } from "~/components/course-image";
+import { plural } from "~/lib/utils";
 import type {
   FeaturedCourse,
   LandingStats,
 } from "~/modules/landing/index.server";
-
-export function plural(count: number, one: string, many: string) {
-  return `${count} ${count === 1 ? one : many}`;
-}
 
 export function LandingHero({
   stats,
