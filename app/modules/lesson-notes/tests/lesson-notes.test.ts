@@ -48,4 +48,17 @@ describe("noteDraft", () => {
   it("treats no saved note as an empty one", () => {
     expect(noteDraft("", null).unsaved).toBe(false);
   });
+
+  it("compares and counts the draft as the action saves it, trimmed", () => {
+    expect(noteDraft("idea \n", "idea")).toMatchObject({
+      unsaved: false,
+      canSave: false,
+    });
+    const atLimit = noteDraft(`${"a".repeat(MAX_NOTE_LENGTH)}\n`, null);
+    expect(atLimit).toMatchObject({
+      length: MAX_NOTE_LENGTH,
+      tooLong: false,
+      canSave: true,
+    });
+  });
 });
