@@ -113,8 +113,8 @@ export function FeaturedCoursesSection({
   return (
     <section className="mx-auto max-w-6xl px-6 py-20">
       <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
-        <SectionHeading eyebrow="Featured" title="Most popular courses">
-          The courses students are enrolling in right now.
+        <SectionHeading eyebrow="Featured" title="Popular courses">
+          Ranked by how many students have enrolled.
         </SectionHeading>
         <Button asChild variant="outline">
           <Link to="/courses">
@@ -141,7 +141,7 @@ const STEPS = [
   {
     icon: PlayCircle,
     title: "Learn at your pace",
-    body: "Short video lessons, notes and hands-on code. Pause and pick up whenever you like.",
+    body: "Short video lessons you can take notes on. Pause and pick up whenever you like.",
   },
   {
     icon: CheckCircle2,

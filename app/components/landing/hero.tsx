@@ -95,7 +95,8 @@ function Spotlight({ course }: { course: FeaturedCourse }) {
         />
         <div className="p-6">
           <p className="text-xs font-semibold uppercase tracking-wider text-primary">
-            Most popular · {course.categoryName}
+            {course.studentCount > 0 ? "Most popular" : "Featured"} ·{" "}
+            {course.categoryName}
           </p>
           <h2 className="mt-2 text-xl font-semibold group-hover:text-primary">
             {course.title}
