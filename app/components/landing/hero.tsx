@@ -1,6 +1,7 @@
 import { Link } from "react-router";
-import { ArrowRight, BookOpen, Sparkles, Users } from "lucide-react";
+import { BookOpen, Sparkles, Users } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import { CoursesButton } from "./courses-button";
 import { CourseImage } from "~/components/course-image";
 import { plural } from "~/lib/utils";
 import type {
@@ -55,12 +56,7 @@ export function LandingHero({
 function HeroActions({ signedIn }: { signedIn: boolean }) {
   return (
     <div className="mt-10 flex flex-wrap items-center gap-3">
-      <Button asChild size="lg">
-        <Link to="/courses">
-          Browse Courses
-          <ArrowRight className="ml-2 size-4" />
-        </Link>
-      </Button>
+      <CoursesButton size="lg" />
       <Button asChild size="lg" variant="outline">
         {signedIn ? (
           <Link to="/dashboard">Go to your dashboard</Link>

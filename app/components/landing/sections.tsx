@@ -1,6 +1,5 @@
 import { Link } from "react-router";
 import {
-  ArrowRight,
   BookOpen,
   CheckCircle2,
   Compass,
@@ -15,6 +14,7 @@ import {
   CardFooter,
   CardHeader,
 } from "~/components/ui/card";
+import { CoursesButton } from "./courses-button";
 import { CourseImage } from "~/components/course-image";
 import type { FeaturedCourse, Topic } from "~/modules/landing/index.server";
 import { plural } from "~/lib/utils";
@@ -116,12 +116,7 @@ export function FeaturedCoursesSection({
         <SectionHeading eyebrow="Featured" title="Popular courses">
           Ranked by how many students have enrolled.
         </SectionHeading>
-        <Button asChild variant="outline">
-          <Link to="/courses">
-            View all courses
-            <ArrowRight className="ml-2 size-4" />
-          </Link>
-        </Button>
+        <CoursesButton variant="outline">View all courses</CoursesButton>
       </div>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {courses.map((course) => (
@@ -192,12 +187,7 @@ export function CallToActionSection({ signedIn }: { signedIn: boolean }) {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button asChild size="lg" variant="secondary">
-            <Link to="/courses">
-              Browse Courses
-              <ArrowRight className="ml-2 size-4" />
-            </Link>
-          </Button>
+          <CoursesButton size="lg" variant="secondary" />
           {!signedIn && (
             <Button
               asChild
