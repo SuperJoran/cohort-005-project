@@ -113,7 +113,7 @@ function Spotlight({ course }: { course: FeaturedCourse }) {
             </span>
             <span className="flex items-center gap-1">
               <Users className="size-3.5" />
-              {plural(course.learnerCount, "learner", "learners")}
+              {plural(course.studentCount, "student", "students")}
             </span>
             <span className="ml-auto">by {course.instructorName}</span>
           </div>

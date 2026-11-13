@@ -19,7 +19,7 @@ export type FeaturedCourse = {
   instructorName: string;
   categoryName: string;
   lessonCount: number;
-  learnerCount: number;
+  studentCount: number;
 };
 
 export type Topic = { name: string; slug: string; courseCount: number };
@@ -44,7 +44,7 @@ function getFeaturedCourses(db: Db): FeaturedCourse[] {
     inner join ${modules} on ${lessons.moduleId} = ${modules.id}
     where ${modules.courseId} = ${courses.id}
   )`.mapWith(Number);
-  const learnerCount = sql<number>`(
+  const studentCount = sql<number>`(
     select count(*) from ${enrollments}
     where ${enrollments.courseId} = ${courses.id}
   )`.mapWith(Number);
@@ -59,13 +59,13 @@ function getFeaturedCourses(db: Db): FeaturedCourse[] {
       instructorName: users.name,
       categoryName: categories.name,
       lessonCount,
-      learnerCount,
+      studentCount,
     })
     .from(courses)
     .innerJoin(users, eq(courses.instructorId, users.id))
     .innerJoin(categories, eq(courses.categoryId, categories.id))
     .where(isPublished)
-    .orderBy(desc(learnerCount), desc(courses.createdAt), desc(courses.id))
+    .orderBy(desc(studentCount), desc(courses.createdAt), desc(courses.id))
     .limit(FEATURED_COURSE_LIMIT)
     .all();
 }

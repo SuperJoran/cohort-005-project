@@ -96,7 +96,7 @@ function FeaturedCourseCard({ course }: { course: FeaturedCourse }) {
           </span>
           <span className="flex items-center gap-1">
             <Users className="size-3" />
-            {course.learnerCount}
+            {course.studentCount}
           </span>
         </CardFooter>
       </Card>
@@ -114,7 +114,7 @@ export function FeaturedCoursesSection({
     <section className="mx-auto max-w-6xl px-6 py-20">
       <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
         <SectionHeading eyebrow="Featured" title="Most popular courses">
-          The courses learners are enrolling in right now.
+          The courses students are enrolling in right now.
         </SectionHeading>
         <Button asChild variant="outline">
           <Link to="/courses">

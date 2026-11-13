@@ -83,8 +83,8 @@ function addLessons(courseId: number, count: number) {
   }
 }
 
-function enroll(courseId: number, learners: number) {
-  for (let i = 0; i < learners; i++) {
+function enroll(courseId: number, students: number) {
+  for (let i = 0; i < students; i++) {
     db.insert(schema.enrollments)
       .values({ userId: addUser().id, courseId })
       .run();
@@ -114,7 +114,7 @@ describe("featured courses", () => {
       "Quiet",
       "Test Course",
     ]);
-    expect(featured.map((c) => c.learnerCount)).toEqual([3, 1, 0]);
+    expect(featured.map((c) => c.studentCount)).toEqual([3, 1, 0]);
   });
 
   it("breaks a tie with the newest course first", () => {
@@ -156,7 +156,7 @@ describe("featured courses", () => {
       instructorName: "Test Instructor",
       categoryName: "Programming",
       lessonCount: 5,
-      learnerCount: 0,
+      studentCount: 0,
     });
   });
 
